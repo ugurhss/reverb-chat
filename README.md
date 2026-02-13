@@ -1,59 +1,96 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Reverb Mini Chat (Laravel 12 + Reverb)
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Bu repo, **Laravel Reverb** ile çalışan çok basit bir “anlık mesajlaşma” (real‑time chat) örneğidir.
 
-## About Laravel
+Kısaca mantık:
+- Tarayıcı **Reverb WebSocket**’ine bağlanır ve `chat` kanalını dinler.
+- Sen “Gönder”e basınca tarayıcı `/messages` endpoint’ine **HTTP POST** atar.
+- Backend `MessageSent` event’ini **broadcast** eder.
+- Diğer açık sekmeler/browsers bu event’i alır ve ekrana basar.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Gereksinimler
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- PHP (bu projede `php -v` ile 8.3 çalışıyor)
+- Composer
+- Node.js + npm
+- (Opsiyonel) MySQL: Projede queue `database` olarak ayarlı. Chat’in çalışması için şart değil, ama bazı şeylerde lazım olabilir.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Kurulum (ilk kez)
 
-## Learning Laravel
+1) Paketleri yükle
+```bash
+composer install
+npm install
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+2) `.env` ayarla
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+3) `.env` içinde Reverb ayarları
 
-## Laravel Sponsors
+Bu projede örnek olarak şunlar var (zaten `.env` içinde bulunuyor):
+- `BROADCAST_CONNECTION=reverb`
+- `REVERB_HOST=localhost`
+- `REVERB_PORT=8080`
+- `REVERB_SCHEME=http`
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
 
-### Premium Partners
+## Çalıştırma (3 terminal)
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Terminal 1 (Laravel HTTP server):
+```bash
+php artisan serve
+```
 
-## Contributing
+Terminal 2 (Reverb WebSocket server):
+```bash
+php artisan reverb:start --debug
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Terminal 3 (Vite - frontend):
+```bash
+npm run dev
+```
 
-## Code of Conduct
+Sonra tarayıcıdan aç:
+- `http://localhost:8000`
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Test için 2 pencere aç:
+- Aynı sayfayı 2 farklı sekmede aç
+- Birinden mesaj at, diğerinde anında gör
 
-## Security Vulnerabilities
+## Projede “neresi ne yapıyor?”
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- UI: `resources/views/chat.blade.php`
+- Frontend (Echo + dinleme + POST): `resources/js/app.js`
+  - Dinlediği kanal: `chat`
+  - Dinlediği event adı: `.message.sent`
+- Backend endpoint: `routes/web.php` içindeki `POST /messages`
+- Controller: `app/Http/Controllers/ChatController.php`
+- Broadcast event: `app/Events/MessageSent.php`
 
-## License
+## Sık görülen hatalar (ve çözüm)
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- “Mesaj gidiyor ama diğer sekmede görünmüyor”
+  - Reverb çalışıyor mu? (`php artisan reverb:start --debug`)
+  - Event broadcast oluyor mu? `app/Events/MessageSent.php` event’i broadcast interface’ini implement etmeli.
+
+- `419 (CSRF token mismatch)`
+  - Sayfada `<meta name="csrf-token" ...>` var mı? (Var: `resources/views/chat.blade.php`)
+  - Frontend request header’da `X-CSRF-TOKEN` gidiyor mu? (`resources/js/app.js`)
+
+- `.env` değiştirdim ama etkilenmedi
+  - `php artisan optimize:clear` çalıştır.
+
+- Veritabanı hatası alıyorum
+  - `.env` içinde `DB_*` satırlarının başında boşluk kalmadığından emin ol.
+  - Session’ı DB’de tutmak istiyorsan `SESSION_DRIVER=database` için `sessions` tablosu gerekir.
+
+## Notlar
+
+- Bu örnekte mesajlar DB’ye yazılmaz; amaç Reverb broadcast akışını göstermek.
+- Frontend’de mesaj basarken `innerHTML` kullanılmadı; basit XSS riskini azaltmak için text olarak eklenir.
+
